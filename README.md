@@ -1,139 +1,135 @@
-# vRemoter
+# vRemoter · 让遥控器成为你的 Mac 快捷键面板
 
-## Fork 说明
+**按一下说话，按一下执行。把常用操作，放到手边。**
 
-本仓库是 [VincentKingHsu/vRemoter](https://github.com/VincentKingHsu/vRemoter) 的个人维护 fork，保留上游 MIT 许可证和作者署名。以下改动不属于上游官方发行版。
+[![macOS](https://img.shields.io/badge/platform-macOS-111111)](https://github.com/willorn/vRemoter)
+[![MIT License](https://img.shields.io/badge/app-MIT-2ea44f)](LICENSE)
+[![Fork](https://img.shields.io/badge/fork-VincentKingHsu%2FvRemoter-586069)](https://github.com/VincentKingHsu/vRemoter)
 
-此 fork 的版本为 `1.1.3-local`：
+[下载与版本记录](https://github.com/willorn/vRemoter/releases) · [快速开始](#快速开始) · [选择安装包](#选择安装包) · [从源码构建](#从源码构建)
 
-- 语音触发键支持录制自定义组合键，例如 `Control + Option + A`；需与输入法的语音快捷键设置一致。
-- 修复录制窗口中 Command 组合键被菜单快捷键截获的问题，改进 Option 字母键的显示。
-- 修复普通按钮菜单中「录制任意按键…」被当前动作名称替代的问题；每个可映射的普通按钮均提供独立录制按钮。
-- 增加右 Option 触发选项及微信输入法的实验性 CoreAudio 状态监听。微信输入法的遥控语音启动尚未验证，不能视为完整兼容。
+vRemoter 把蓝牙语音遥控器变成 macOS 的桌面控制器：用语音键启动输入，用其他按钮触发你自己的快捷键。写代码、改文档、翻页面，常用动作都可以交给手里的遥控器。
 
-使用自定义语音快捷键：打开「按键映射」，在「触发键」中选择「自定义组合键…」，按下组合键后点击「保存映射」。系统保留的快捷键可能无法由录制窗口捕获。
+这是基于 [VincentKingHsu/vRemoter](https://github.com/VincentKingHsu/vRemoter) 的个人维护 fork，重点改进**任意组合键录制**与**输入法适配**。App 保留上游 MIT 许可证及作者署名，不属于上游官方发行版。
 
-以下保留上游项目介绍；其中官网、下载、打赏与更新服务均由上游维护。本 fork 的构建包沿用上游更新服务配置，安装官方更新可能覆盖此 fork 的改动。
+## 一个遥控器，多一种工作方式
 
----
+| 想做的事 | vRemoter 怎么帮你 |
+| --- | --- |
+| 把想法说出来 | 用语音键控制输入法；Chromecast 支持短按切换、长按说话 |
+| 给常用操作留一个实体按钮 | 为方向、确认、返回、YouTube、Netflix、音量等普通按钮录制按键或组合键 |
+| 使用 `Control + Option + A` 这样的快捷键 | 普通按钮映射和语音触发键都支持录制自定义组合键 |
+| 更换同型号遥控器 | 映射按型号保存，无需重新配置每一只设备 |
+| 调整语音输入来源 | 通过 `vRemoteDr 2ch` 混合遥控器与 Mac 麦克风，并分别调整输入开关 |
 
-> 本仓库保存 vRemoter 的源码、设计源稿、构建脚本与测试。普通用户请通过 `vincentstudio.org` 系列域名访问官网、下载与更新服务。
+例如，把 YouTube 键设为 `⌃⌥A`，把 Netflix 键设为 `⌘V`，把方向键留给页面导航。具体动作由接收快捷键的 App 决定，可以配合编辑器或系统中已有的快捷键使用。
 
-[官方网站](https://vremoter.vincentstudio.org/) · [下载最新版](https://updates.vincentstudio.org/vremoter/) · [v1.1.1 Release](https://github.com/VincentKingHsu/vRemoter/releases/tag/v1.1.1)
+<details>
+<summary>查看界面参考</summary>
 
-## 产品定位
+以下为上游 1.1.1 的界面截图，展示音频控制台和按键映射布局；此 fork 增加了自定义语音快捷键、输入法选择和普通按钮的独立录制入口。
 
-vRemoter 把蓝牙语音遥控器变成 macOS 上的 Vibe Coding 控制器：遥控器语音键控制豆包输入法，遥控器麦克风与 MacBook 麦克风混合为同一个 CoreAudio 输入设备 `vRemoteDr 2ch`。
+![音频控制台：分别控制 Mac 与遥控器音频输入](docs/assets/screenshots/vremoter-audio-1.1.1.png)
 
-已接入的遥控器：
+![按键映射：按遥控器型号配置常用操作](docs/assets/screenshots/vremoter-mapping-chromecast-1.1.1.png)
 
-- X6-Remote（VID `0x1D5A` / PID `0xC081`）
-- Google Chromecast Remote（VID `0x18D1` / PID `0x9450`）
+</details>
 
-Chromecast Remote 已实现语音键双模式：短按第一次打开、第二次关闭；长按时持续录音，松手自动关闭。APP 还提供按型号保存的按键映射，可把方向、确认、返回、Home、YouTube、Netflix、信源、音量等按键改为常用 macOS 操作。
+## 此 fork 改进了什么
 
-当前版本：`1.1.1`
+版本：**`1.1.3-local`**
 
-## 1.1.1 修复
+- **普通按钮都能直接录制。** 每个可映射的普通按钮旁都有独立录制按钮；菜单中的「录制任意按键…」也能正确显示。
+- **语音快捷键不再限于单个修饰键。** 支持录制 `Control + Option + 字母` 等组合，并提供独立的右 Option 选项。
+- **录制更符合预期。** Command 组合键会交给录制窗口处理；Option 字母键按实际物理键显示，避免把 `⌥A` 显示成特殊字符。
+- **微信输入法实验性接入。** 可选择微信或豆包作为录音状态监听目标，配合语音会话控制使用。
 
-- 修复 Chromecast Voice Remote 使用一段时间后，短按偶尔只打开豆包、遥控器麦克风却未持续收音的问题。
-- 修复电脑 Option 关闭豆包时，较晚到达的音频状态可能短暂重新开启遥控器音频的问题。
-- 改进双遥控器同时连接时的会话隔离、开麦确认与有限重试。
-- 修复 X6 第一次短按开麦可能被误判为旧音频事件的问题。
-- 更新按键映射页中的 Chromecast Remote 产品图。
+微信输入法的语音启动已在一台搭载微信输入法 3.0.0 的 Mac 上验证；遥控器混音输入、不同版本与不同配置下的行为仍需进一步验证，因此继续标记为实验功能。
 
-## 1.1.0 新功能
+## 快速开始
 
-- 新增 Chromecast Voice Remote（VID `0x18D1` / PID `0x9450`）语音与按键支持。
-- 新增 X6 Remote 与 Chromecast Voice Remote 按键映射页面。
-- 豆包语音触发键可选择 Option、Command、Control、Shift 或 Fn，默认 Option；所选按键必须与豆包输入法设置一致。
-- 映射设置跟随型号，不绑定某一只遥控器；更换同型号设备后继续沿用。
-- 启用映射后拦截设备原始动作，再由 vRemoter 发送所选键盘、媒体键或自定义快捷键；关闭映射即可恢复系统原行为。
-- 主控制台去掉 X6 专属措辞，X6 与 Chromecast Remote 可以同时连接。
+### 1. 安装并连接遥控器
 
-![vRemoter 1.1.1 音频控制台](docs/assets/screenshots/vremoter-audio-1.1.1.png)
+按[安装包说明](#选择安装包)安装 App。首次使用遥控器音频输入时，还需要安装音频驱动。通过 macOS 蓝牙设置配对受支持的遥控器，再打开 vRemoter。
 
-![vRemoter 1.1.1 Chromecast 按键映射](docs/assets/screenshots/vremoter-mapping-chromecast-1.1.1.png)
+按 App 提示在系统设置中授予蓝牙、麦克风、辅助功能与输入监控权限。
 
-完整历史见 [CHANGELOG.md](CHANGELOG.md)。
+### 2. 给普通按钮录制快捷键
 
-当前支持边界：Chromecast 仅确认上述 VID/PID；X6 鼠标模式切换键由设备固件内部处理，不能单独重映射。语音键保留给豆包语音控制。Fn 的实际行为取决于 Mac 与豆包配置，建议首次使用时现场测试。
+1. 打开「按键映射」，选择遥控器型号并启用映射。
+2. 点击目标按钮右侧的录制图标，或在菜单中选择「录制任意按键…」。
+3. 按下希望使用的按键或组合键，点击「保存映射」。
 
-## 支持开发
+例如，按下 `Control + Option + A`，保存后对应遥控器按钮就会发送 `⌃⌥A`。关闭「启用映射」可恢复设备原有行为。
 
-vRemoter 免费提供。制作不易，麻烦打个赏补偿一点我的 Token 费吧。谢主隆恩🙏🙏🙏～～～
+### 3. 配置语音输入
 
-| 微信 / WeChat | 支付宝 / Alipay | PayPal |
-|---|---|---|
-| <img src="docs/assets/donate/wechat.JPG" alt="微信打赏二维码" width="220"> | <img src="docs/assets/donate/alipay.JPG" alt="支付宝打赏二维码" width="220"> | <img src="docs/assets/donate/paypal.JPG" alt="PayPal donation QR code" width="220"> |
+1. 在「按键映射」中选择豆包或微信输入法。
+2. 选择语音触发键，或使用「自定义组合键…」录制快捷键；此设置必须与输入法中的语音快捷键一致。
+3. 要让输入法接收遥控器与 Mac 的混音，请让输入法使用 `vRemoteDr 2ch` 音频设备。
 
-## 仓库与公开服务边界
+输入法选项用于确定要监听哪个程序的真实录音状态，以便同步开关遥控器音频。普通按钮发送快捷键不依赖这一选择。
 
-| 内容 | 位置 | 是否公开 |
-|---|---|---|
-| APP、驱动构建、测试与设计 | 本 GitHub 仓库 | 是 |
-| 官网静态源文件 | `docs/` | 是，部署结果见官网 |
-| 官网 | [vremoter.vincentstudio.org](https://vremoter.vincentstudio.org/) | 是 |
-| 更新、PKG/DMG、购买配置 | [updates.vincentstudio.org/vremoter](https://updates.vincentstudio.org/vremoter/) | 是 |
-| 原始宣传视频与市场素材 | 仓库外 `../marketing/` | 否，不上传 Git |
+能打开语音面板，不代表已经使用遥控器麦克风：如果输入法仍使用 Mac 内置麦克风，采集的就是 Mac 音频。
 
-遥控器相关 GitHub 仓库：
+## 选择安装包
 
-- [VincentKingHsu/vRemoter](https://github.com/VincentKingHsu/vRemoter)
-- [VincentKingHsu/x6-remote-voice-bridge](https://github.com/VincentKingHsu/x6-remote-voice-bridge)
-- [VincentKingHsu/MiRemoteVoice](https://github.com/VincentKingHsu/MiRemoteVoice)
+发布采用两种安装包，分别面向首次安装和日常更新：
 
-## 目录
+| 安装包 | 包含什么 | 什么时候选 |
+| --- | --- | --- |
+| **DMG** | 仅包含 App，不安装或更新驱动 | 已安装音频驱动，日常更新 vRemoter |
+| **PKG** | App + `vRemoteDriver.driver` 音频驱动 | 首次使用遥控器混音，或某个版本明确要求更新驱动 |
 
-- `Sources/vRemote/`：APP 主程序、BLE/ATVV、双麦混音、UI、更新与购买配置。
-- `Driver/`：生成 `vRemoteDriver.driver` 的实验性构建脚本。
-- `Packaging/`：APP 元数据、本地化与 PKG 安装脚本。
-- `Resources/`：APP 内置权限向导、商业入口与支持开发图片。
-- `SelfTests/`：硬件协议与更新配置回归数据。
-- `Design/`：冻结 UI 和 Logo 的 Figma 本地插件源稿。
-- `docs/`：公开官网静态源文件。
-- `Server/`：马来西亚服务器配置与发布清单模板。
-- `OPERATIONS.md`：从构建到上线和回滚的操作手册。
+**已有驱动，优先使用 DMG。** 退出 vRemoter，打开磁盘映像，将 App 拖入「应用程序」并替换旧版，然后重新打开。DMG 不执行驱动安装流程；若旧版 App 的所有权或系统权限限制替换，Finder 仍可能要求管理员验证。
 
-## 构建
+PKG 会将驱动安装到系统音频目录，需要管理员验证，安装脚本会重启系统音频服务。正在使用音频设备时，请安排好安装时机。
+
+请以 [GitHub Releases](https://github.com/willorn/vRemoter/releases) 中每个版本实际列出的附件、架构和安装说明为准。本地构建使用 ad-hoc 签名，未完成 Developer ID 签名与 Apple 公证。
+
+## 支持的设备与边界
+
+| 设备 | 已接入的型号标识 |
+| --- | --- |
+| Google Chromecast Voice Remote | VID `0x18D1` / PID `0x9450` |
+| X6-Remote | VID `0x1D5A` / PID `0xC081` |
+
+- 语音键用于语音会话控制；其他可映射的普通按钮用于发送自定义按键。
+- X6 的鼠标模式切换属于设备固件内部功能，不能独立重映射。
+- macOS 保留的快捷键可能无法录制；Fn 的表现取决于设备和输入法配置。
+- 自定义快捷键能否触发目标动作，取决于前台 App、快捷键冲突及相关系统权限。
+- 音频驱动基于 BlackHole，按 GPL v3 单独授权；与 App 的 MIT 许可证分开，详见[第三方许可说明](THIRD_PARTY_NOTICES.md)。
+
+## 从源码构建
+
+在 macOS 上使用 Swift 与 Command Line Tools 构建。首次构建会通过 Swift Package Manager 获取项目依赖。
 
 ```bash
+# 音频协议回归检查
 ./run-self-tests.sh
+
+# 快捷键与语音会话回归检查
+swift build -c debug
+.build/debug/vRemote --voice-session-self-test
+
+# 构建 App
 ./package-app.sh
-./build-pkg.sh
+
+# 仅更新 App 的 DMG
 ./build-dmg.sh
+
+# 包含驱动的首次安装 PKG
+./build-pkg.sh
 ```
 
-- `PKG`：首次安装或驱动发生变化时使用，包含 APP 与音频驱动。
-- `DMG`：仅更新 APP，适合已经安装过驱动且本次驱动未变化的用户。
+App 输出到 `dist/build/vRemote.app`，DMG 与 PKG 输出到 `dist/`。PKG 构建还需要本机安装 BlackHole 2ch，具体方法和分发要求见 [Driver/README.md](Driver/README.md)。App 默认按构建机器的架构编译，请勿将单架构构建标记为通用包。
 
-1.1.1 的驱动没有变化：PKG 供首次安装，DMG 供已经安装过驱动的用户覆盖更新。当前发布包尚未完成 Developer ID 签名与公证，下载页必须明确标注这一状态；正式广泛分发前仍须完成签名、公证与真实机器安装验证。
+公开分发包含驱动的 PKG 时，还需提供驱动对应的源码与构建材料，或取得适用的商业授权；仅保留许可证文件不能替代这一要求。详见[构建与运维说明](OPERATIONS.md)。
 
-## 更新策略
+## 上游、更新与致谢
 
-APP 从以下地址读取版本清单：
+感谢 [VincentKingHsu/vRemoter](https://github.com/VincentKingHsu/vRemoter) 提供原始项目，以及第三方项目对音频驱动、ATVV 协议和解码实现的贡献。原作者署名、许可证及第三方声明均予保留。
 
-`https://updates.vincentstudio.org/vremoter/releases.json`
+此 fork 的下载与版本记录以[本仓库 Releases](https://github.com/willorn/vRemoter/releases)为准。App 内的检查更新、购买与支持开发入口目前仍沿用上游配置，由上游维护；安装上游官方更新可能覆盖此 fork 的改动。
 
-- 普通 APP 更新：清单中同时提供 DMG/PKG，APP 自动优先下载 DMG。
-- 驱动更新：将 `driver_update_required` 设为 `true`，APP 强制下载 PKG。
-- 首次安装：官网始终推荐 PKG。
-
-购买链接从以下地址动态读取：
-
-`https://updates.vincentstudio.org/vremoter/commerce.json`
-
-修改公开配置即可控制购买入口，不需要重新发布 APP。没有启用且有效的购买链接时，APP 会隐藏“购买遥控器”按钮。
-
-## 发布前阻断项
-
-1. 当前驱动是对 BlackHole GPL v3 二进制的修改构建。公开分发前必须选择：提供驱动对应源码与构建材料，或取得适用于闭源分发的商业授权。
-2. APP、驱动与 PKG/DMG 尚需 Developer ID 签名和 notarization。
-3. 每次发布都要验证首次 PKG 安装、DMG 覆盖更新、自动检查更新、购买链接刷新和卸载/回滚。
-
-## 相关文档
-
-- [完整发布与服务器运维手册](OPERATIONS.md)
-- [第三方许可说明](THIRD_PARTY_NOTICES.md)
-- [音频驱动说明](Driver/README.md)
-- [冻结 UI 说明](Design/vRemoter-UI-v1-Frozen/UI-FREEZE.md)
+[上游仓库](https://github.com/VincentKingHsu/vRemoter) · [上游官网](https://vremoter.vincentstudio.org/) · [第三方许可](THIRD_PARTY_NOTICES.md) · [驱动说明](Driver/README.md) · [上游更新历史](CHANGELOG.md) · [构建与运维说明](OPERATIONS.md)

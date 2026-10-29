@@ -1,0 +1,33 @@
+README.md
+  s_2210f82dc01a01::t_5fdae8eb01a26e 3-18
+Sources/vRemote/InputTrigger.swift
+  s_c1dbf6fb4c1ecd::t_0a89c538729589 10-11,22-23,34-35,50-51,57,83-86,93,95-97
+Sources/vRemote/VoiceSessionSelfTest.swift
+  s_c1dbf6fb4c1ecd::t_d8a0e46a95bef4 3,127,142-180
+Sources/vRemote/X6SearchSuppressor.swift
+  s_c1dbf6fb4c1ecd::t_071d9f13459b9f 140,149,153-167
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ea674e50287735602398490118dc67ba4d89b2bc",
+  "prompts": {},
+  "sessions": {
+    "s_2210f82dc01a01": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a16895-c220-7213-be25-edb859410fe8",
+        "model": "nexavlinks/deepseek-v4.1-flash"
+      },
+      "human_author": "Tianyi <willorn@qq.com>"
+    },
+    "s_c1dbf6fb4c1ecd": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a18770-8af3-7653-b619-73b6cd0f223b",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Tianyi <willorn@qq.com>"
+    }
+  }
+}

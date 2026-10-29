@@ -4,6 +4,7 @@ import AVFoundation
 import CoreBluetooth
 import CoreGraphics
 import SwiftUI
+import UniformTypeIdentifiers
 
 enum PermissionKind: String, Identifiable, CaseIterable {
     case doubaoInput
@@ -1052,7 +1053,7 @@ private struct MappingRow: View {
     @ObservedObject private var mappings = RemoteMappingStore.shared
     @State private var showRecorder = false
     @State private var isDropTargeted = false
-    private static let dragType = "local.simaqingfeng.vremote.mapping-button"
+    private static let dragType = UTType(exportedAs: "local.simaqingfeng.vremote.mapping-button", conformingTo: .data)
     let remote: SupportedRemoteID
     let button: RemoteButtonDefinition
     let enabled: Bool
@@ -1061,14 +1062,16 @@ private struct MappingRow: View {
         HStack(spacing: 8) {
             if button.remappable && !button.voiceControlled {
                 Image(systemName: "line.3.horizontal")
-                    .frame(width: 18)
+                    .frame(width: 18, height: 24)
+                    .contentShape(Rectangle())
                     .foregroundStyle(ConsoleTheme.secondary)
                     .help(L10n.text("拖到另一按键上交换映射", "Drag onto another button to swap mappings"))
                     .accessibilityLabel(L10n.text("拖动\(button.title)映射", "Drag \(button.title) mapping"))
                     .onDrag {
+                        print("[MAP-DRAG] begin remote=\(remote.rawValue) button=\(button.id)")
                         let provider = NSItemProvider()
                         let data = Data("\(remote.rawValue):\(button.id)".utf8)
-                        provider.registerDataRepresentation(forTypeIdentifier: Self.dragType, visibility: .ownProcess) { completion in
+                        provider.registerDataRepresentation(forTypeIdentifier: Self.dragType.identifier, visibility: .all) { completion in
                             completion(data, nil)
                             return nil
                         }
@@ -1135,8 +1138,9 @@ private struct MappingRow: View {
             isDropTargeted ? ConsoleTheme.green : .clear, lineWidth: 1.5
         ))
         .onDrop(of: [Self.dragType], isTargeted: $isDropTargeted) { providers in
+            print("[MAP-DRAG] drop remote=\(remote.rawValue) button=\(button.id) providers=\(providers.count)")
             guard button.remappable, !button.voiceControlled, let provider = providers.first else { return false }
-            provider.loadDataRepresentation(forTypeIdentifier: Self.dragType) { data, _ in
+            provider.loadDataRepresentation(forTypeIdentifier: Self.dragType.identifier) { data, _ in
                 guard let data, let text = String(data: data, encoding: .utf8) else { return }
                 let parts = text.split(separator: ":", maxSplits: 1).map(String.init)
                 guard parts.count == 2, parts[0] == remote.rawValue else { return }

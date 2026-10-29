@@ -26,6 +26,17 @@
     <string>12.0</string>
     <key>LSUIElement</key>
     <true/>
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>local.simaqingfeng.vremote.mapping-button</string>
+            <key>UTTypeConformsTo</key>
+            <array><string>public.data</string></array>
+            <key>UTTypeDescription</key>
+            <string>vRemoter button mapping</string>
+        </dict>
+    </array>
     <key>VRReleasesURL</key>
     <string>https://updates.vincentstudio.org/vremoter/releases.json</string>
     <key>VRCommerceConfigURL</key>

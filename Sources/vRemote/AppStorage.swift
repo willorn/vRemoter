@@ -1,5 +1,18 @@
 import Foundation
 
+enum VoiceInputMethod: String, CaseIterable, Identifiable {
+    case doubao
+    case weType
+
+    var id: String { rawValue }
+    var title: String {
+        self == .doubao ? L10n.text("豆包", "Doubao") : L10n.text("微信输入法（实验）", "WeType (experimental)")
+    }
+    var bundleID: String {
+        self == .doubao ? "com.bytedance.inputmethod.doubaoime" : "com.tencent.inputmethod.wetype"
+    }
+}
+
 enum AppStorage {
     static let loggingEnabledKey = "loggingEnabled"
     static let recordingEnabledKey = "recordingEnabled"
@@ -70,6 +83,25 @@ enum AppStorage {
         set {
             UserDefaults.standard.set(newValue.rawValue, forKey: inputTriggerKeyKey)
         }
+    }
+
+    static var customVoiceShortcut: RemoteCustomShortcut? {
+        get {
+            guard let data = UserDefaults.standard.data(forKey: "customVoiceShortcut") else { return nil }
+            return try? JSONDecoder().decode(RemoteCustomShortcut.self, from: data)
+        }
+        set {
+            if let newValue, let data = try? JSONEncoder().encode(newValue) {
+                UserDefaults.standard.set(data, forKey: "customVoiceShortcut")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "customVoiceShortcut")
+            }
+        }
+    }
+
+    static var voiceInputMethod: VoiceInputMethod {
+        get { VoiceInputMethod(rawValue: UserDefaults.standard.string(forKey: "voiceInputMethod") ?? "") ?? .doubao }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: "voiceInputMethod") }
     }
 
     static func ensureDirectory(_ url: URL) {

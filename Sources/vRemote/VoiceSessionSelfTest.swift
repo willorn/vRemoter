@@ -1,5 +1,6 @@
 #if DEBUG
 import CoreAudio
+import AppKit
 import Foundation
 
 enum VoiceSessionSelfTest {
@@ -123,6 +124,7 @@ enum VoiceSessionSelfTest {
 
     static func run() -> Bool {
         let checks = CheckContext()
+        testCustomShortcut(checks)
         testActiveBeforeRelease(checks)
         testStopBeforeActive(checks)
         testSecondTapCloses(checks)
@@ -135,6 +137,45 @@ enum VoiceSessionSelfTest {
         testDebouncedRetry(checks)
         emit("[SELF-TEST] completed failures=\(checks.failures)")
         return checks.failures == 0
+    }
+
+    private static func testCustomShortcut(_ c: CheckContext) {
+        guard let event = NSEvent.keyEvent(with: .keyDown, location: .zero,
+            modifierFlags: [.control, .option], timestamp: 0, windowNumber: 0,
+            context: nil, characters: "å", charactersIgnoringModifiers: "å",
+            isARepeat: false, keyCode: 0),
+            let cgEvent = event.cgEvent else {
+            c.expect(false, "shortcut test event creation")
+            return
+        }
+        let shortcut = KeyboardCaptureNSView.shortcut(from: event)
+        c.expect(shortcut.label == "⌃⌥A", "Option letter retains physical key label")
+        c.expect(shortcut.keyCode == 0 && shortcut.flags == CGEventFlags([.maskControl, .maskAlternate]).rawValue,
+            "Control Option A retains key code and modifiers")
+        let oldTrigger = AppStorage.inputTriggerKey
+        let oldShortcut = AppStorage.customVoiceShortcut
+        defer {
+            AppStorage.customVoiceShortcut = oldShortcut
+            AppStorage.inputTriggerKey = oldTrigger
+        }
+        AppStorage.customVoiceShortcut = shortcut
+        AppStorage.inputTriggerKey = .custom
+        c.expect(AppStorage.customVoiceShortcut == shortcut, "custom voice shortcut persists")
+        let observer = X6SearchSuppressor()
+        var down = 0
+        var up = 0
+        observer.onTriggerDownObserved = { _ in down += 1 }
+        observer.onTriggerUpObserved = { _ in up += 1 }
+        observer.observeTriggerEvent(type: .keyDown, event: cgEvent, isSynthetic: false)
+        observer.observeTriggerEvent(type: .keyDown, event: cgEvent, isSynthetic: false)
+        cgEvent.flags = []
+        observer.observeTriggerEvent(type: .keyUp, event: cgEvent, isSynthetic: false)
+        c.expect(down == 1 && up == 1, "shortcut repeats ignored; release works after modifiers lift")
+        observer.observeTriggerEvent(type: .keyDown, event: cgEvent, isSynthetic: false)
+        c.expect(down == 1, "plain letter does not activate modified shortcut")
+        cgEvent.flags = [.maskControl, .maskAlternate]
+        observer.observeTriggerEvent(type: .keyDown, event: cgEvent, isSynthetic: true)
+        c.expect(down == 1, "synthetic shortcut is not counted twice")
     }
 
     private static func testActiveBeforeRelease(_ c: CheckContext) {

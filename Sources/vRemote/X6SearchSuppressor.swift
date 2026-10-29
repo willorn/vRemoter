@@ -137,7 +137,7 @@ final class X6SearchSuppressor {
         tapPort = nil
     }
 
-    private func observeTriggerEvent(
+    func observeTriggerEvent(
         type: CGEventType,
         event: CGEvent,
         isSynthetic: Bool
@@ -146,9 +146,24 @@ final class X6SearchSuppressor {
         // X6-generated Option events are handed to the coordinator directly
         // before posting. Observing them again here would execute the same
         // microphone transition twice.
-        guard !isSynthetic else { return }
+        guard !isSynthetic, !Key.isCapturingShortcut else { return }
         let trigger = AppStorage.inputTriggerKey
         guard trigger.keyCodes.contains(keyCode) else { return }
+
+        if trigger == .custom {
+            switch type {
+            case .keyDown:
+                let mask: CGEventFlags = [.maskControl, .maskAlternate, .maskCommand, .maskShift, .maskSecondaryFn]
+                guard event.flags.intersection(mask) == trigger.flag.intersection(mask),
+                      triggerKeysDown.insert(keyCode).inserted else { return }
+                onTriggerDownObserved?(false)
+            case .keyUp:
+                guard triggerKeysDown.remove(keyCode) != nil else { return }
+                onTriggerUpObserved?(false)
+            default: break
+            }
+            return
+        }
 
         // macOS normally reports modifier edges as `flagsChanged`, but on
         // some keyboards/input-method paths the DOWN edge arrives as a plain

@@ -1,5 +1,21 @@
 # vRemoter
 
+## Fork 说明
+
+本仓库是 [VincentKingHsu/vRemoter](https://github.com/VincentKingHsu/vRemoter) 的个人维护 fork，保留上游 MIT 许可证和作者署名。以下改动不属于上游官方发行版。
+
+此 fork 的版本为 `1.1.2-local`：
+
+- 语音触发键支持录制自定义组合键，例如 `Control + Option + A`；需与输入法的语音快捷键设置一致。
+- 修复录制窗口中 Command 组合键被菜单快捷键截获的问题，改进 Option 字母键的显示。
+- 增加右 Option 触发选项及微信输入法的实验性 CoreAudio 状态监听。微信输入法的遥控语音启动尚未验证，不能视为完整兼容。
+
+使用自定义语音快捷键：打开「按键映射」，在「触发键」中选择「自定义组合键…」，按下组合键后点击「保存映射」。系统保留的快捷键可能无法由录制窗口捕获。
+
+以下保留上游项目介绍；其中官网、下载、打赏与更新服务均由上游维护。本 fork 的构建包沿用上游更新服务配置，安装官方更新可能覆盖此 fork 的改动。
+
+---
+
 > 本仓库保存 vRemoter 的源码、设计源稿、构建脚本与测试。普通用户请通过 `vincentstudio.org` 系列域名访问官网、下载与更新服务。
 
 [官方网站](https://vremoter.vincentstudio.org/) · [下载最新版](https://updates.vincentstudio.org/vremoter/) · [v1.1.1 Release](https://github.com/VincentKingHsu/vRemoter/releases/tag/v1.1.1)

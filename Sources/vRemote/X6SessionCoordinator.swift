@@ -858,6 +858,8 @@ final class X6SessionCoordinator {
     }
 
     private func publish(_ status: String) {
-        onStateChanged?(status)
+        onStateChanged?(AppStorage.voiceInputMethod == .weType
+            ? status.replacingOccurrences(of: "豆包", with: "微信输入法")
+            : status)
     }
 }

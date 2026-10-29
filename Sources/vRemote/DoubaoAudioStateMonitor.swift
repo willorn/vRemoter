@@ -31,7 +31,6 @@ final class DoubaoAudioStateMonitor {
         }
     }
 
-    private static let targetBundleID = "com.bytedance.inputmethod.doubaoime"
     private static let targetDeviceName = "vRemoteDr 2ch"
 
     private var started = false
@@ -102,7 +101,7 @@ final class DoubaoAudioStateMonitor {
 
     private func refreshBindingIfNeeded() {
         let app = NSRunningApplication.runningApplications(
-            withBundleIdentifier: Self.targetBundleID
+            withBundleIdentifier: AppStorage.voiceInputMethod.bundleID
         ).first { !$0.isTerminated }
 
         guard let app else {
@@ -188,7 +187,7 @@ final class DoubaoAudioStateMonitor {
            !snapshot.inputDeviceNames.contains(Self.targetDeviceName)
         {
             print(
-                "[DOUBAO-STATE] ⚠️ 豆包正在录音，但实际输入不是 " +
+                "[VOICE-STATE] \(AppStorage.voiceInputMethod.title) 正在录音，但实际输入不是 " +
                 Self.targetDeviceName
             )
         }

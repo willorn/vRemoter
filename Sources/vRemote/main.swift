@@ -486,7 +486,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let doubaoUsesVRemote = doubaoSnapshot.inputDeviceNames.contains("vRemoteDr 2ch")
         let statusText: String
         if doubaoSnapshot.isRecording && !doubaoUsesVRemote {
-            statusText = L10n.text("豆包输入设备错误", "Incorrect Doubao input")
+            statusText = L10n.text("输入法音频设备错误", "Incorrect input method audio device")
         } else if remoteStreaming {
             statusText = L10n.text("遥控器录音中", "Remote recording")
         } else if anyHID && anyBLE {
@@ -546,6 +546,8 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self?.updateStatus()
         }
         debugWindow.onInputTriggerChanged = { [weak self] in
+            self?.x6Session.stop()
+            self?.x6Session.start()
             self?.x6SearchSuppressor.triggerConfigurationDidChange()
         }
         debugWindow.onRemoteMappingEnabledChanged = { [weak self] remote, enabled in

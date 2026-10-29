@@ -255,6 +255,8 @@ private final class ConsoleViewModel: ObservableObject {
     @Published var x6Connected = false
     @Published var chromecastConnected = false
     @Published var inputTriggerKey = AppStorage.inputTriggerKey
+    @Published var showVoiceShortcutRecorder = false
+    @Published var voiceInputMethod = AppStorage.voiceInputMethod
     @Published var activeModal: ConsoleModal?
     @Published var showX6MicHint = !UserDefaults.standard.bool(
         forKey: "vRemoter.hasCompletedX6MicTest"
@@ -274,6 +276,10 @@ private final class ConsoleViewModel: ObservableObject {
     var remoteSolo: Bool { remoteInputEnabled && !macInputEnabled }
 
     func setInputTrigger(_ trigger: InputTriggerKey) {
+        if trigger == .custom {
+            showVoiceShortcutRecorder = true
+            return
+        }
         guard inputTriggerKey != trigger else { return }
         inputTriggerKey = trigger
         AppStorage.inputTriggerKey = trigger
@@ -346,6 +352,10 @@ private final class ConsoleViewModel: ObservableObject {
     }
 
     private func openDoubaoSettings() {
+        if AppStorage.voiceInputMethod == .weType {
+            NSWorkspace.shared.open(URL(fileURLWithPath: "/Library/Input Methods/WeType.app"))
+            return
+        }
         let bundleIdentifier = "com.bytedance.inputmethod.doubaoime.settings"
         let candidates = [
             NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier),
@@ -735,7 +745,7 @@ private struct StudioMixerView: View {
     private var statusPanel: some View {
         VStack(spacing: 0) {
             StatusRow(
-                title: L10n.text("豆包输入设备", "Doubao input"),
+                title: L10n.text("输入法音频设备", "Input method audio device"),
                 value: model.doubaoIsRecording
                     ? (model.doubaoUsesVRemote
                         ? L10n.text("vRemoteDr 2ch · 录音中", "vRemoteDr 2ch · Recording")
@@ -870,13 +880,16 @@ private struct KeyMappingView: View {
                 HStack(spacing: 7) {
                     Image(systemName: "waveform.badge.mic")
                         .foregroundStyle(ConsoleTheme.green)
-                    Text(L10n.text("豆包语音触发键", "Doubao voice trigger"))
+                    Text(L10n.text("语音触发键", "Voice trigger"))
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(ConsoleTheme.text)
                 }
-                Text(L10n.text(
-                    "遥控器语音键与电脑键盘都使用这个按键控制豆包。这里必须与豆包输入法中的语音快捷键保持一致。",
-                    "The remote voice key and Mac keyboard both use this trigger. It must match Doubao Input Method's voice shortcut."
+                Text(model.voiceInputMethod == .weType ? L10n.text(
+                    "微信输入法兼容性测试中：可先用键盘开启语音，输入设备需选 vRemoteDr 2ch。遥控触发尚未验证。",
+                    "WeType compatibility is experimental. Start voice input with the keyboard and select vRemoteDr 2ch. Remote activation is unverified."
+                ) : L10n.text(
+                    "支持单键或任意组合键，例如 Control + Option + A。这里必须与输入法的语音快捷键保持一致。",
+                    "Choose a key or shortcut, such as Control + Option + A. It must match the input method's voice shortcut."
                 ))
                     .font(.system(size: 12.5))
                     .foregroundStyle(ConsoleTheme.secondary)
@@ -884,6 +897,21 @@ private struct KeyMappingView: View {
             }
             Spacer(minLength: 10)
             VStack(alignment: .trailing, spacing: 7) {
+                Picker(L10n.text("输入法", "Input method"), selection: Binding(
+                    get: { model.voiceInputMethod },
+                    set: { method in
+                        model.voiceInputMethod = method
+                        AppStorage.voiceInputMethod = method
+                        model.onInputTriggerChanged?()
+                    }
+                )) {
+                    ForEach(VoiceInputMethod.allCases) { method in
+                        Text(method.title).tag(method)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 180)
+                .disabled(model.remoteStreaming || model.doubaoIsRecording)
                 Picker(
                     L10n.text("触发键", "Trigger"),
                     selection: Binding(
@@ -898,6 +926,12 @@ private struct KeyMappingView: View {
                 .labelsHidden()
                 .frame(width: 158)
                 .disabled(model.remoteStreaming)
+                if model.inputTriggerKey == .custom {
+                    Button(L10n.text("重新录制组合键", "Record shortcut again")) {
+                        model.showVoiceShortcutRecorder = true
+                    }
+                    .disabled(model.remoteStreaming)
+                }
                 if model.inputTriggerKey == .function {
                     Label(
                         L10n.text("Fn 需在本机测试", "Test Fn on this Mac"),
@@ -914,6 +948,19 @@ private struct KeyMappingView: View {
         }
         .padding(.horizontal, 19)
         .background(panelBackground(ConsoleTheme.surface, radius: 17))
+        .sheet(isPresented: $model.showVoiceShortcutRecorder) {
+            KeyboardShortcutCaptureView(
+                buttonTitle: L10n.text("语音触发键", "Voice trigger"),
+                onCancel: { model.showVoiceShortcutRecorder = false },
+                onSave: { shortcut in
+                    AppStorage.customVoiceShortcut = shortcut
+                    AppStorage.inputTriggerKey = .custom
+                    model.inputTriggerKey = .custom
+                    model.onInputTriggerChanged?()
+                    model.showVoiceShortcutRecorder = false
+                }
+            )
+        }
     }
 
     private var devicePanel: some View {
@@ -1241,13 +1288,30 @@ private struct KeyboardEventCaptureView: NSViewRepresentable {
     }
 }
 
-private final class KeyboardCaptureNSView: NSView {
+final class KeyboardCaptureNSView: NSView {
     var onCapture: ((RemoteCustomShortcut) -> Void)?
+    private var eventMonitor: Any?
+
+    deinit {
+        if let eventMonitor { NSEvent.removeMonitor(eventMonitor) }
+        Key.isCapturingShortcut = false
+    }
 
     override var acceptsFirstResponder: Bool { true }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        if let eventMonitor { NSEvent.removeMonitor(eventMonitor) }
+        eventMonitor = nil
+        Key.isCapturingShortcut = window != nil
+        if window != nil {
+            // Capture before menu equivalents and focus navigation consume the key.
+            eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self, event.window === self.window else { return event }
+                if !event.isARepeat { self.onCapture?(Self.shortcut(from: event)) }
+                return nil
+            }
+        }
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.window?.makeFirstResponder(self)
@@ -1259,7 +1323,7 @@ private final class KeyboardCaptureNSView: NSView {
         onCapture?(Self.shortcut(from: event))
     }
 
-    private static func shortcut(from event: NSEvent) -> RemoteCustomShortcut {
+    static func shortcut(from event: NSEvent) -> RemoteCustomShortcut {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         var flags: CGEventFlags = []
         var prefix = ""
@@ -1279,6 +1343,9 @@ private final class KeyboardCaptureNSView: NSView {
             flags.insert(.maskCommand)
             prefix += "⌘"
         }
+        if modifiers.contains(.function) {
+            flags.insert(.maskSecondaryFn)
+        }
 
         let special: [UInt16: String] = [
             0x24: "Return", 0x30: "Tab", 0x31: "Space", 0x33: "Delete",
@@ -1288,7 +1355,14 @@ private final class KeyboardCaptureNSView: NSView {
             0x60: "F5", 0x61: "F6", 0x62: "F7", 0x64: "F8",
             0x65: "F9", 0x6D: "F10", 0x67: "F11", 0x6F: "F12",
         ]
-        let key = special[event.keyCode]
+        // Option modifies charactersIgnoringModifiers on macOS (for example A becomes å).
+        let letters: [UInt16: String] = [
+            0: "A", 1: "S", 2: "D", 3: "F", 4: "H", 5: "G", 6: "Z", 7: "X",
+            8: "C", 9: "V", 11: "B", 12: "Q", 13: "W", 14: "E", 15: "R",
+            16: "Y", 17: "T", 31: "O", 32: "U", 34: "I", 35: "P", 37: "L",
+            38: "J", 40: "K", 45: "N", 46: "M"
+        ]
+        let key = special[event.keyCode] ?? letters[event.keyCode]
             ?? event.charactersIgnoringModifiers?.uppercased()
             ?? String(format: "Key 0x%02X", event.keyCode)
         return RemoteCustomShortcut(
@@ -1465,7 +1539,7 @@ private struct OutputChannelView: View {
             Text(L10n.text("混合输出", "Mixed Output"))
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(ConsoleTheme.text)
-            Text(L10n.text("发送给豆包", "Sent to Doubao"))
+            Text(L10n.text("发送给输入法", "Sent to input method"))
                 .font(.system(size: 13))
                 .foregroundStyle(ConsoleTheme.secondary)
                 .padding(.top, 4)
@@ -1523,7 +1597,7 @@ private struct OutputChannelView: View {
             .padding(.top, 25)
             Text(outputError
                 ? L10n.text("等待音频链路恢复", "Waiting for audio route")
-                : L10n.text("豆包正在接收", "Doubao is receiving"))
+                : L10n.text("输入法正在接收", "Input method is receiving"))
                 .font(.system(size: 11))
                 .foregroundStyle(outputError ? ConsoleTheme.red : ConsoleTheme.secondary)
                 .padding(.top, 15)

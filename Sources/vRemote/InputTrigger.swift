@@ -7,6 +7,8 @@ enum InputTriggerKey: String, CaseIterable, Identifiable {
     case control
     case shift
     case function
+    case rightOption
+    case custom
 
     var id: String { rawValue }
 
@@ -17,6 +19,8 @@ enum InputTriggerKey: String, CaseIterable, Identifiable {
         case .control: "Control (⌃)"
         case .shift: "Shift (⇧)"
         case .function: "Fn / Globe"
+        case .rightOption: "Right Option (⌥)"
+        case .custom: AppStorage.customVoiceShortcut?.label ?? L10n.text("自定义组合键…", "Custom shortcut…")
         }
     }
 
@@ -27,6 +31,8 @@ enum InputTriggerKey: String, CaseIterable, Identifiable {
         case .control: [0x3B, 0x3E]
         case .shift: [0x38, 0x3C]
         case .function: [0x3F]
+        case .rightOption: [0x3D]
+        case .custom: AppStorage.customVoiceShortcut.map { [Int64($0.keyCode)] } ?? []
         }
     }
 
@@ -41,11 +47,14 @@ enum InputTriggerKey: String, CaseIterable, Identifiable {
         case .control: .maskControl
         case .shift: .maskShift
         case .function: .maskSecondaryFn
+        case .rightOption: .maskAlternate
+        case .custom: CGEventFlags(rawValue: AppStorage.customVoiceShortcut?.flags ?? 0)
         }
     }
 }
 
 enum Key {
+    static var isCapturingShortcut = false
     /// Lets the event tap distinguish vRemoter-generated events from physical
     /// keyboards, Bluetooth buttons, and external remappers.
     static let syntheticMarker: Int64 = 0x4D_49_52_42 // "MIRB"
@@ -71,13 +80,21 @@ enum Key {
     }
 
     private static func post(trigger: InputTriggerKey, keyDown: Bool) {
+        if trigger == .custom {
+            AppStorage.customVoiceShortcut?.post(isDown: keyDown)
+            return
+        }
         let source = CGEventSource(stateID: .hidSystemState)
         guard let event = CGEvent(
             keyboardEventSource: source,
             virtualKey: trigger.primaryKeyCode,
             keyDown: keyDown
         ) else { return }
+        if trigger == .rightOption { event.type = .flagsChanged }
         event.flags = keyDown ? trigger.flag : []
+        if trigger == .rightOption, keyDown {
+            event.flags = CGEventFlags(rawValue: event.flags.rawValue | 0x40)
+        }
         event.setIntegerValueField(.eventSourceUserData, value: syntheticMarker)
         event.post(tap: .cghidEventTap)
         print(

@@ -26,6 +26,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private var headerLabel: NSMenuItem!
     private var launchAtLoginItem: NSMenuItem!
+    private var showInDockItems: [NSMenuItem] = []
     private var loggingToggleItem: NSMenuItem!
     private var logSizeItem: NSMenuItem!
     private var recordingToggleItem: NSMenuItem!
@@ -50,7 +51,6 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         doubaoState: doubaoAudioState
     )
     private let debugWindow = DebugWindowController()
-    private let updateWindow = UpdateWindowController()
     private let x6BLE = BLEBridge(
         nameHint: "X6-Remote",
         savedUUIDFilename: "x6-uuid.txt",
@@ -67,8 +67,8 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     )
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.accessory)
         AppStorage.prepare()
+        NSApp.setActivationPolicy(AppStorage.showInDock ? .regular : .accessory)
         AppAnalytics.configure()
         // Keep one continuous diagnostic history while X6 is being tuned.
         // Log.swift rotates at 5 MB; only the explicit menu action clears it.
@@ -97,6 +97,13 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(header)
         headerLabel = header
 
+        let open = NSMenuItem(
+            title: L10n.text("打开前台控制台", "Open console"),
+            action: #selector(openDebugWindow), keyEquivalent: ""
+        )
+        open.target = self
+        menu.addItem(open)
+
         let launch = NSMenuItem(
             title: L10n.text("登录时自动启动", "Launch at login"),
             action: #selector(toggleLaunchAtLogin),
@@ -106,28 +113,19 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(launch)
         launchAtLoginItem = launch
 
+        let dock = NSMenuItem(
+            title: L10n.text("在 Dock 中显示", "Show in Dock"),
+            action: #selector(toggleShowInDock), keyEquivalent: ""
+        )
+        dock.target = self
+        menu.addItem(dock)
+        showInDockItems.append(dock)
+
         menu.addItem(.separator())
         menu.addItem(makeControlMenu())
         menu.addItem(makeLogMenu())
         menu.addItem(makeRecordingMenu())
         menu.addItem(makeLanguageMenu())
-
-        menu.addItem(.separator())
-        let updates = NSMenuItem(
-            title: L10n.text("版本与更新…", "Version & Updates…"),
-            action: #selector(openVersionUpdates),
-            keyEquivalent: ""
-        )
-        updates.target = self
-        menu.addItem(updates)
-
-        let donation = NSMenuItem(
-            title: L10n.text("打赏", "Buy me a coffee"),
-            action: #selector(openDonation),
-            keyEquivalent: ""
-        )
-        donation.target = self
-        menu.addItem(donation)
 
         menu.addItem(.separator())
         let quit = NSMenuItem(
@@ -138,6 +136,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         quit.target = self
         menu.addItem(quit)
         statusItem.menu = menu
+        configureApplicationMenu()
         refreshMenuState()
         wireDebugWindow()
 
@@ -307,29 +306,58 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                 self?.debugWindow.showPurchase()
             }
-        } else if CommandLine.arguments.contains("--update-available-demo") {
-            print("[UPDATE] update-available demo requested")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                self?.updateWindow.showDemoUpdate()
-            }
-        } else if CommandLine.arguments.contains("--update-current-demo") {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                self?.updateWindow.showUpToDateDemo()
-            }
-        } else if CommandLine.arguments.contains("--updates-window-demo") {
-            print("[UPDATE] updates-window demo requested")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                self?.updateWindow.show()
-            }
-        } else {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 8) { [weak self] in
-                self?.updateWindow.checkAutomatically()
-            }
         }
     }
 
     func menuWillOpen(_ menu: NSMenu) {
         refreshMenuState()
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        debugWindow.show()
+        return true
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
+    }
+
+    func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+        let menu = NSMenu()
+        let open = NSMenuItem(
+            title: L10n.text("打开前台控制台", "Open console"),
+            action: #selector(openDebugWindow), keyEquivalent: ""
+        )
+        open.target = self
+        menu.addItem(open)
+        return menu
+    }
+
+    private func configureApplicationMenu() {
+        let main = NSMenu()
+        let root = NSMenuItem()
+        main.addItem(root)
+        let menu = NSMenu(title: "vRemoter")
+        menu.delegate = self
+        let open = NSMenuItem(
+            title: L10n.text("打开前台控制台", "Open console"),
+            action: #selector(openDebugWindow), keyEquivalent: ""
+        )
+        open.target = self
+        menu.addItem(open)
+        let dock = NSMenuItem(
+            title: L10n.text("在 Dock 中显示", "Show in Dock"),
+            action: #selector(toggleShowInDock), keyEquivalent: ""
+        )
+        dock.target = self
+        menu.addItem(dock)
+        showInDockItems.append(dock)
+        menu.addItem(.separator())
+        let quit = NSMenuItem(title: L10n.text("退出", "Quit"), action: #selector(quit), keyEquivalent: "q")
+        quit.target = self
+        menu.addItem(quit)
+        root.submenu = menu
+        NSApp.mainMenu = main
     }
 
     private func makeLogMenu() -> NSMenuItem {
@@ -379,16 +407,8 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func makeControlMenu() -> NSMenuItem {
-        let root = NSMenuItem(title: L10n.text("控制台", "Console"), action: nil, keyEquivalent: "")
-        let submenu = NSMenu(title: L10n.text("控制台", "Console"))
-
-        let open = NSMenuItem(
-            title: L10n.text("打开前台控制台", "Open console"),
-            action: #selector(openDebugWindow),
-            keyEquivalent: ""
-        )
-        open.target = self
-        submenu.addItem(open)
+        let root = NSMenuItem(title: L10n.text("更多操作", "More actions"), action: nil, keyEquivalent: "")
+        let submenu = NSMenu(title: root.title)
 
         let stop = NSMenuItem(
             title: L10n.text("关闭麦克风", "Stop microphone"),
@@ -564,13 +584,6 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
         debugWindow.show()
     }
 
-    @objc private func openDonation() {
-        debugWindow.showDonation()
-    }
-
-    @objc private func openVersionUpdates() {
-        updateWindow.show()
-    }
 
     @objc private func selectSystemLanguage() {
         setLanguageAndRestart(.system)
@@ -673,6 +686,7 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func refreshMenuState() {
         launchAtLoginItem?.state = LaunchAtLogin.isEnabled ? .on : .off
+        showInDockItems.forEach { $0.state = AppStorage.showInDock ? .on : .off }
         loggingToggleItem?.state = Log.isEnabled ? .on : .off
         recordingToggleItem?.state = AppStorage.recordingEnabled ? .on : .off
         refreshSizeLabels()
@@ -697,6 +711,13 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 "Status · Launch-at-login failed"
             )
         }
+        refreshMenuState()
+    }
+
+    @objc private func toggleShowInDock() {
+        let enabled = !AppStorage.showInDock
+        guard NSApp.setActivationPolicy(enabled ? .regular : .accessory) else { return }
+        AppStorage.showInDock = enabled
         refreshMenuState()
     }
 

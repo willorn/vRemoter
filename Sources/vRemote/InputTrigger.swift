@@ -55,6 +55,8 @@ enum InputTriggerKey: String, CaseIterable, Identifiable {
 
 enum Key {
     static var isCapturingShortcut = false
+    static var shortcutCaptureHandler: ((CGEventType, CGEvent) -> Bool)?
+    static var shortcutCaptureFilteringAvailable = false
     /// Lets the event tap distinguish vRemoter-generated events from physical
     /// keyboards, Bluetooth buttons, and external remappers.
     static let syntheticMarker: Int64 = 0x4D_49_52_42 // "MIRB"

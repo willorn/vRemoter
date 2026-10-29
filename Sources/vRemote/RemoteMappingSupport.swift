@@ -248,12 +248,14 @@ final class RemoteMappingStore: ObservableObject {
     static let shared = RemoteMappingStore()
 
     @Published private(set) var revision = 0
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
     private let prefix = "remoteMapping."
     private let enabledPrefix = "remoteMappingEnabled."
     private let customPrefix = "remoteCustomMapping."
 
-    private init() {}
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
 
     func isEnabled(_ remote: SupportedRemoteID) -> Bool {
         defaults.bool(forKey: enabledPrefix + remote.rawValue)
@@ -309,6 +311,34 @@ final class RemoteMappingStore: ObservableObject {
             defaults.set(data, forKey: key)
             setTarget(.custom, for: button, remote: remote)
         }
+    }
+
+    @discardableResult
+    func swapMappings(from sourceID: String, to destinationID: String, remote: SupportedRemoteID) -> Bool {
+        let buttons = RemoteProfiles.buttons(for: remote)
+        guard sourceID != destinationID,
+              let source = buttons.first(where: { $0.id == sourceID }),
+              let destination = buttons.first(where: { $0.id == destinationID }),
+              source.remappable, !source.voiceControlled,
+              destination.remappable, !destination.voiceControlled else { return false }
+
+        let sourceTarget = target(for: source, remote: remote)
+        let destinationTarget = target(for: destination, remote: remote)
+        let sourceShortcut = defaults.data(forKey: customPrefix + remote.rawValue + "." + sourceID)
+        let destinationShortcut = defaults.data(forKey: customPrefix + remote.rawValue + "." + destinationID)
+        guard (sourceTarget != .custom || customShortcut(for: source, remote: remote) != nil),
+              (destinationTarget != .custom || customShortcut(for: destination, remote: remote) != nil)
+        else { return false }
+
+        defaults.set(destinationTarget.rawValue, forKey: prefix + remote.rawValue + "." + sourceID)
+        defaults.set(sourceTarget.rawValue, forKey: prefix + remote.rawValue + "." + destinationID)
+        for (id, data) in [(sourceID, destinationShortcut), (destinationID, sourceShortcut)] {
+            let key = customPrefix + remote.rawValue + "." + id
+            if let data { defaults.set(data, forKey: key) }
+            else { defaults.removeObject(forKey: key) }
+        }
+        revision += 1
+        return true
     }
 
     func targetTitle(

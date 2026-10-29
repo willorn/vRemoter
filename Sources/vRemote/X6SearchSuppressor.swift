@@ -57,6 +57,11 @@ final class X6SearchSuppressor {
                 .eventSourceUserData
             ) == Key.syntheticMarker
 
+            // Consume recording input before system-wide launch shortcuts see it.
+            if !isSynthetic, Key.shortcutCaptureHandler?(type, event) == true {
+                return nil
+            }
+
             if isSynthetic {
                 print(
                     "[X6-FILTER] delivered synthetic Option " +
@@ -102,17 +107,20 @@ final class X6SearchSuppressor {
             callback: callback,
             userInfo: Unmanaged.passUnretained(self).toOpaque()
         ) else {
+            isAvailable = false
             print("[X6-FILTER] unable to create event tap")
             return
         }
         tapPort = tap
         guard let source = CFMachPortCreateRunLoopSource(nil, tap, 0) else {
+            isAvailable = false
             print("[X6-FILTER] unable to create run-loop source")
             tapPort = nil
             return
         }
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
+        Key.shortcutCaptureFilteringAvailable = true
         print("[X6-FILTER] native Search suppression ready")
     }
 
@@ -129,6 +137,7 @@ final class X6SearchSuppressor {
     }
 
     func stop() {
+        Key.shortcutCaptureFilteringAvailable = false
         armedUntil = .distantPast
         triggerKeysDown.removeAll()
         if let tapPort {

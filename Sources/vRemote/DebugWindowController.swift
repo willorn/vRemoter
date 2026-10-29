@@ -197,15 +197,11 @@ private enum RemoteImageAsset {
 
 private enum ConsoleModal: Identifiable {
     case permission(PermissionKind)
-    case donationPrompt
-    case donation
     case purchase
 
     var id: String {
         switch self {
         case .permission(let kind): "permission-\(kind.id)"
-        case .donationPrompt: "donation-prompt"
-        case .donation: "donation"
         case .purchase: "purchase"
         }
     }
@@ -262,7 +258,6 @@ private final class ConsoleViewModel: ObservableObject {
         forKey: "vRemoter.hasCompletedX6MicTest"
     )
 
-    private var donationPromptShownInSession = false
 
     var onStopMicrophone: (() -> Void)?
     var onRestartApp: (() -> Void)?
@@ -337,7 +332,6 @@ private final class ConsoleViewModel: ObservableObject {
         } else {
             bluetoothGranted = true
         }
-        evaluateDonationPrompt()
     }
 
     func openSettings(for kind: PermissionKind) {
@@ -380,28 +374,10 @@ private final class ConsoleViewModel: ObservableObject {
         }
     }
 
-    func showDonation(manual: Bool = true) {
-        if manual { DonationPromptSchedule.markHandled() }
-        activeModal = .donation
-    }
-
     func showPurchase() {
         CommerceConfigModel.shared.refresh()
         AppAnalytics.signal("Commerce.opened")
         activeModal = .purchase
-    }
-
-    func showDonationFromPrompt() {
-        DonationPromptSchedule.markHandled()
-        activeModal = nil
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
-            self?.activeModal = .donation
-        }
-    }
-
-    func dismissDonationPrompt() {
-        DonationPromptSchedule.markHandled()
-        activeModal = nil
     }
 
     func observeRemoteLevel(_ db: Double) {
@@ -411,30 +387,7 @@ private final class ConsoleViewModel: ObservableObject {
         showX6MicHint = false
     }
 
-    private func evaluateDonationPrompt() {
-        guard !donationPromptShownInSession else { return }
-        if CommandLine.arguments.contains("--donation-prompt-demo") {
-            presentDonationPrompt()
-            return
-        }
-        let doubaoHealthy = !doubaoIsRecording || doubaoUsesVRemote
-        let allHealthy = hidConnected
-            && bleConnected
-            && driverAvailable
-            && microphoneGranted
-            && accessibilityGranted
-            && inputMonitoringGranted
-            && doubaoHealthy
-        guard DonationPromptSchedule.shouldPresent(isHealthy: allHealthy) else { return }
-        presentDonationPrompt()
-    }
 
-    private func presentDonationPrompt() {
-        donationPromptShownInSession = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
-            self?.activeModal = .donationPrompt
-        }
-    }
 }
 
 final class DebugWindowController: NSWindowController, NSWindowDelegate {
@@ -509,6 +462,7 @@ final class DebugWindowController: NSWindowController, NSWindowDelegate {
         model.refreshPermissions()
         startPermissionTimer()
         NSApp.activate(ignoringOtherApps: true)
+        if window.isMiniaturized { window.deminiaturize(nil) }
         window.makeKeyAndOrderFront(nil)
     }
 
@@ -552,11 +506,6 @@ final class DebugWindowController: NSWindowController, NSWindowDelegate {
 
     func updateRemoteLevel(_ db: Double) {
         DispatchQueue.main.async { [weak self] in self?.model.observeRemoteLevel(db) }
-    }
-
-    func showDonation() {
-        model.showDonation()
-        show()
     }
 
     func showPurchase() {
@@ -604,10 +553,6 @@ private struct StudioMixerView: View {
         .padding(20)
         .frame(width: 775, height: 658)
         .background(ConsoleTheme.panel)
-        .overlay(alignment: .bottom) {
-            supportLink
-                .padding(.bottom, 8)
-        }
         .sheet(item: $model.activeModal) { modal in
             switch modal {
             case .permission(let kind):
@@ -616,13 +561,6 @@ private struct StudioMixerView: View {
                     onCancel: { model.activeModal = nil },
                     onOpenSettings: { model.openSettings(for: kind) }
                 )
-            case .donationPrompt:
-                DonationPromptView(
-                    onDonate: model.showDonationFromPrompt,
-                    onLater: model.dismissDonationPrompt
-                )
-            case .donation:
-                DonationView()
             case .purchase:
                 PurchaseView(model: .shared)
             }
@@ -670,22 +608,6 @@ private struct StudioMixerView: View {
         }
         .padding(.horizontal, 20)
         .background(panelBackground(ConsoleTheme.surface, radius: 19))
-    }
-
-    private var supportLink: some View {
-        Button {
-            model.showDonation()
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "cup.and.saucer.fill")
-                Text(L10n.text("打赏", "Buy me a coffee"))
-            }
-            .font(.system(size: 10.5, weight: .medium))
-            .foregroundStyle(ConsoleTheme.tertiary)
-            .fixedSize(horizontal: true, vertical: false)
-        }
-        .buttonStyle(.plain)
-        .help(L10n.text("支持 vRemoter", "Support vRemoter"))
     }
 
     private var statusText: String {
@@ -1030,7 +952,7 @@ private struct KeyMappingView: View {
                         Text(selectedDevice.title)
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(ConsoleTheme.text)
-                        Text(L10n.text("点击右侧菜单修改按键", "Use each menu to assign a key"))
+                        Text(L10n.text("拖动左侧手柄交换映射", "Drag handles to swap mappings"))
                             .font(.system(size: 10.5))
                             .foregroundStyle(ConsoleTheme.tertiary)
                     }
@@ -1129,15 +1051,34 @@ private struct DeviceSelectionRow: View {
 private struct MappingRow: View {
     @ObservedObject private var mappings = RemoteMappingStore.shared
     @State private var showRecorder = false
+    @State private var isDropTargeted = false
+    private static let dragType = "local.simaqingfeng.vremote.mapping-button"
     let remote: SupportedRemoteID
     let button: RemoteButtonDefinition
     let enabled: Bool
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: button.symbol)
-                .frame(width: 18)
-                .foregroundStyle(button.voiceControlled ? ConsoleTheme.green : ConsoleTheme.secondary)
+            if button.remappable && !button.voiceControlled {
+                Image(systemName: "line.3.horizontal")
+                    .frame(width: 18)
+                    .foregroundStyle(ConsoleTheme.secondary)
+                    .help(L10n.text("拖到另一按键上交换映射", "Drag onto another button to swap mappings"))
+                    .accessibilityLabel(L10n.text("拖动\(button.title)映射", "Drag \(button.title) mapping"))
+                    .onDrag {
+                        let provider = NSItemProvider()
+                        let data = Data("\(remote.rawValue):\(button.id)".utf8)
+                        provider.registerDataRepresentation(forTypeIdentifier: Self.dragType, visibility: .ownProcess) { completion in
+                            completion(data, nil)
+                            return nil
+                        }
+                        return provider
+                    }
+            } else {
+                Image(systemName: button.symbol)
+                    .frame(width: 18)
+                    .foregroundStyle(button.voiceControlled ? ConsoleTheme.green : ConsoleTheme.secondary)
+            }
             Text(button.title)
                 .font(.system(size: 11.5, weight: .medium))
                 .foregroundStyle(ConsoleTheme.text)
@@ -1190,6 +1131,21 @@ private struct MappingRow: View {
         .padding(.horizontal, 9)
         .background(ConsoleTheme.surface2)
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(
+            isDropTargeted ? ConsoleTheme.green : .clear, lineWidth: 1.5
+        ))
+        .onDrop(of: [Self.dragType], isTargeted: $isDropTargeted) { providers in
+            guard button.remappable, !button.voiceControlled, let provider = providers.first else { return false }
+            provider.loadDataRepresentation(forTypeIdentifier: Self.dragType) { data, _ in
+                guard let data, let text = String(data: data, encoding: .utf8) else { return }
+                let parts = text.split(separator: ":", maxSplits: 1).map(String.init)
+                guard parts.count == 2, parts[0] == remote.rawValue else { return }
+                DispatchQueue.main.async {
+                    mappings.swapMappings(from: parts[1], to: button.id, remote: remote)
+                }
+            }
+            return true
+        }
         .accessibilityElement(children: .contain)
         .sheet(isPresented: $showRecorder) {
             KeyboardShortcutCaptureView(
@@ -1243,7 +1199,9 @@ private struct KeyboardShortcutCaptureView: View {
                     Text(captured?.label ?? L10n.text("现在按下键盘按键", "Press a key now"))
                         .font(.system(size: 18, weight: .semibold, design: .rounded))
                         .foregroundStyle(captured == nil ? ConsoleTheme.secondary : ConsoleTheme.text)
-                    Text(L10n.text("支持 Command / Option / Control / Shift 组合", "Command / Option / Control / Shift are supported"))
+                    Text(Key.shortcutCaptureFilteringAvailable
+                        ? L10n.text("录制时拦截全局快捷键，避免触发 Thor 等启动器", "Global shortcuts are intercepted while recording")
+                        : L10n.text("需辅助功能权限，才能阻止 Thor 等启动器抢占按键", "Accessibility permission is needed to intercept global shortcuts"))
                         .font(.system(size: 10.5))
                         .foregroundStyle(ConsoleTheme.tertiary)
                 }
@@ -1294,6 +1252,7 @@ final class KeyboardCaptureNSView: NSView {
     deinit {
         if let eventMonitor { NSEvent.removeMonitor(eventMonitor) }
         Key.isCapturingShortcut = false
+        Key.shortcutCaptureHandler = nil
     }
 
     override var acceptsFirstResponder: Bool { true }
@@ -1303,7 +1262,17 @@ final class KeyboardCaptureNSView: NSView {
         if let eventMonitor { NSEvent.removeMonitor(eventMonitor) }
         eventMonitor = nil
         Key.isCapturingShortcut = window != nil
+        Key.shortcutCaptureHandler = nil
         if window != nil {
+            Key.shortcutCaptureHandler = { [weak self] type, event in
+                guard let self, self.window?.isKeyWindow == true, NSApp.isActive,
+                      type == .keyDown || type == .keyUp else { return false }
+                if type == .keyDown, event.getIntegerValueField(.keyboardEventAutorepeat) == 0,
+                   let nsEvent = NSEvent(cgEvent: event) {
+                    self.onCapture?(Self.shortcut(from: nsEvent))
+                }
+                return true
+            }
             // Capture before menu equivalents and focus navigation consume the key.
             eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
                 guard let self, event.window === self.window else { return event }
@@ -1820,157 +1789,6 @@ private extension CommerceStore {
         case "douyin": Color(red: 0.145, green: 0.902, blue: 0.941)
         default: ConsoleTheme.green
         }
-    }
-}
-
-private enum DonationProvider: String, CaseIterable, Identifiable {
-    case wechat
-    case alipay
-    case paypal
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .wechat: L10n.text("微信", "WeChat")
-        case .alipay: L10n.text("支付宝", "Alipay")
-        case .paypal: "PayPal"
-        }
-    }
-
-    var imageName: String {
-        switch self {
-        case .wechat: "IMG_5989.JPG"
-        case .alipay: "IMG_5987.JPG"
-        case .paypal: "IMG_5990.JPG"
-        }
-    }
-
-    var brandColor: Color {
-        switch self {
-        case .wechat: Color(red: 0.027, green: 0.757, blue: 0.376)
-        case .alipay: Color(red: 0.086, green: 0.467, blue: 1.0)
-        case .paypal: Color(red: 0.0, green: 0.188, blue: 0.529)
-        }
-    }
-}
-
-private struct DonationPromptView: View {
-    let onDonate: () -> Void
-    let onLater: () -> Void
-
-    var body: some View {
-        VStack(spacing: 22) {
-            Image(nsImage: LogoAsset.image)
-                .resizable()
-                .frame(width: 54, height: 54)
-            Text(L10n.text(
-                "制作不易，麻烦打个赏补偿一点我的 Token 费吧。\n谢主隆恩🙏🙏🙏～～～",
-                "vRemoter is free, but apparently tokens never got that memo. If the app saves you a little time, buying me a coffee helps keep it going. My API balance sends its thanks. 🙏"
-            ))
-                .font(.system(size: 21, weight: .semibold))
-                .foregroundStyle(ConsoleTheme.text)
-                .multilineTextAlignment(.center)
-                .lineSpacing(5)
-                .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 12) {
-                Button(L10n.text("以后再说", "Maybe later"), action: onLater)
-                    .keyboardShortcut(.cancelAction)
-                    .buttonStyle(ConsoleButtonStyle(tone: .neutral))
-                Button(L10n.text("立即打赏", "Buy me a coffee"), action: onDonate)
-                    .keyboardShortcut(.defaultAction)
-                    .buttonStyle(ConsoleButtonStyle(tone: ConsoleButtonTone.good))
-            }
-        }
-        .padding(30)
-        .frame(width: 560, height: 330)
-        .background(ConsoleTheme.panel)
-    }
-}
-
-private struct DonationView: View {
-    @Environment(\.dismiss) private var dismiss
-    @State private var provider: DonationProvider = .wechat
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack {
-                Image(nsImage: LogoAsset.image)
-                    .resizable()
-                    .frame(width: 38, height: 38)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(L10n.text("给 vRemoter 打个赏", "Buy vRemoter a coffee"))
-                        .font(.system(size: 20, weight: .semibold))
-                    Text(L10n.text("感谢你帮我补一点 Token 费", "Free app, non-free tokens."))
-                        .font(.system(size: 11))
-                        .foregroundStyle(ConsoleTheme.secondary)
-                }
-                Spacer()
-            }
-
-            HStack(spacing: 8) {
-                ForEach(DonationProvider.allCases) { item in
-                    Button {
-                        provider = item
-                    } label: {
-                        Text(item.title)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(
-                                provider == item ? Color.white : item.brandColor
-                            )
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 36)
-                            .background(
-                                provider == item
-                                    ? item.brandColor
-                                    : ConsoleTheme.surface
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 7))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 7)
-                                    .stroke(
-                                        provider == item
-                                            ? item.brandColor
-                                            : item.brandColor.opacity(0.65),
-                                        lineWidth: 1
-                                    )
-                            )
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-
-            ZStack {
-                ConsoleTheme.black
-                if let image = DonationAsset.image(named: provider.imageName) {
-                    Image(nsImage: image)
-                        .resizable()
-                        .interpolation(.high)
-                        .scaledToFit()
-                        .padding(12)
-                } else {
-                    Text(L10n.text("收款码暂不可用", "Payment code unavailable"))
-                        .foregroundStyle(ConsoleTheme.secondary)
-                }
-            }
-            .frame(height: 390)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(ConsoleTheme.line))
-
-            HStack {
-                Text(L10n.text("请使用对应 App 扫码", "Scan with the corresponding app"))
-                    .font(.system(size: 11))
-                    .foregroundStyle(ConsoleTheme.secondary)
-                Spacer()
-                Button(L10n.text("完成", "Done")) { dismiss() }
-                    .keyboardShortcut(.defaultAction)
-                    .buttonStyle(ConsoleButtonStyle(tone: ConsoleButtonTone.good))
-            }
-        }
-        .padding(24)
-        .frame(width: 620, height: 570)
-        .background(ConsoleTheme.panel)
-        .foregroundStyle(ConsoleTheme.text)
     }
 }
 

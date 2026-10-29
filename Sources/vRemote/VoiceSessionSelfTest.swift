@@ -125,6 +125,7 @@ enum VoiceSessionSelfTest {
     static func run() -> Bool {
         let checks = CheckContext()
         testCustomShortcut(checks)
+        testMappingSwap(checks)
         testActiveBeforeRelease(checks)
         testStopBeforeActive(checks)
         testSecondTapCloses(checks)
@@ -137,6 +138,37 @@ enum VoiceSessionSelfTest {
         testDebouncedRetry(checks)
         emit("[SELF-TEST] completed failures=\(checks.failures)")
         return checks.failures == 0
+    }
+
+    private static func testMappingSwap(_ c: CheckContext) {
+        let suite = "vRemote.mapping-self-test." + UUID().uuidString
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = RemoteMappingStore(defaults: defaults)
+        let remote = SupportedRemoteID.chromecast
+        let buttons = RemoteProfiles.buttons(for: remote)
+        let a = buttons[0]
+        let b = buttons[1]
+        let first = RemoteCustomShortcut(keyCode: 0, flags: CGEventFlags.maskControl.rawValue, label: "Control A")
+        let second = RemoteCustomShortcut(keyCode: 8, flags: CGEventFlags.maskCommand.rawValue, label: "Command C")
+        store.setCustomShortcut(first, for: a, remote: remote)
+        c.expect(store.swapMappings(from: a.id, to: b.id, remote: remote), "custom and preset mapping can swap")
+        c.expect(store.target(for: a, remote: remote) == b.defaultTarget,
+            "preset moves to source without being overwritten")
+        c.expect(store.customShortcut(for: b, remote: remote) == first && store.target(for: b, remote: remote) == .custom,
+            "custom key and modifiers move to destination")
+        store.setCustomShortcut(second, for: a, remote: remote)
+        c.expect(store.swapMappings(from: a.id, to: b.id, remote: remote), "two custom mappings can swap")
+        let restored = RemoteMappingStore(defaults: defaults)
+        c.expect(restored.customShortcut(for: a, remote: remote) == first
+            && restored.customShortcut(for: b, remote: remote) == second,
+            "both custom shortcuts survive swapping and store reload")
+        let revision = store.revision
+        c.expect(!store.swapMappings(from: a.id, to: a.id, remote: remote)
+            && !store.swapMappings(from: "voice", to: b.id, remote: remote)
+            && !store.swapMappings(from: "unknown", to: b.id, remote: remote)
+            && store.revision == revision,
+            "self, voice and unknown drops leave mappings unchanged")
     }
 
     private static func testCustomShortcut(_ c: CheckContext) {

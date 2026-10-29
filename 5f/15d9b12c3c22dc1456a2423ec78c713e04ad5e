@@ -1,0 +1,18 @@
+Packaging/Info.plist
+  h_8195c5342f3ab5 22,24
+README.md
+  h_8195c5342f3ab5 7,11
+Sources/vRemote/DebugWindowController.swift
+  h_8195c5342f3ab5 1171,1179-1180,1182-1185,1193
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5f15d9b12c3c22dc1456a2423ec78c713e04ad5e",
+  "prompts": {},
+  "humans": {
+    "h_8195c5342f3ab5": {
+      "author": "Tianyi <willorn@qq.com>"
+    }
+  }
+}

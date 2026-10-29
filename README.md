@@ -122,7 +122,7 @@ swift build -c debug
 ./build-pkg.sh
 ```
 
-App 输出到 `dist/build/vRemote.app`，DMG 与 PKG 输出到 `dist/`。PKG 构建还需要本机安装 BlackHole 2ch，具体方法和分发要求见 [Driver/README.md](Driver/README.md)。App 默认按构建机器的架构编译，请勿将单架构构建标记为通用包。
+App 输出到 `dist/build/vRemote.app`，DMG 与 PKG 输出到 `dist/`。PKG 构建会下载并校验固定版本的 BlackHole 源码，再编译音频驱动，无需预先安装 BlackHole；离线重建方法见 [Driver/README.md](Driver/README.md)。App 默认按构建机器的架构编译，请勿将单架构构建标记为通用包。
 
 公开分发包含驱动的 PKG 时，还需提供驱动对应的源码与构建材料，或取得适用的商业授权；仅保留许可证文件不能替代这一要求。详见[构建与运维说明](OPERATIONS.md)。
 

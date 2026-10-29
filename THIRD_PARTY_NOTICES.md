@@ -12,6 +12,10 @@ Its ATVV protocol and IMA/DVI ADPCM implementation were informed by:
 
 `vRemoteDriver.driver` is a modified build of
 [ExistentialAudio/BlackHole](https://github.com/ExistentialAudio/BlackHole)
-0.4.1 and remains licensed under GNU GPL v3. The proof-of-concept build script
-documents every binary-level modification. BlackHole's original license is
-preserved inside the generated driver bundle.
+v0.5.0 (commit `1dcceef64731f30f384b0683ce928f9e6c38153c`) and remains licensed
+under GNU GPL v3. `Driver/build-driver.sh` verifies the upstream source archive,
+applies the vRemote name, identifiers and audio-device transport changes, and
+compiles the driver with Apple's Command Line Tools. BlackHole's original
+copyright and license are preserved. Releases containing the driver also include
+the complete modified source and an offline build script in a separate source
+archive; see `Driver/README.md` for details.

@@ -1168,7 +1168,7 @@ private struct MappingRow: View {
                     ) {
                         ForEach(RemoteMappingTarget.allCases.filter { $0 != .doubaoVoice }) { target in
                             Text(
-                                target == .custom
+                                target == .custom && mappings.target(for: button, remote: remote) == .custom
                                     ? mappings.targetTitle(for: button, remote: remote)
                                     : target.title
                             ).tag(target)
@@ -1176,14 +1176,13 @@ private struct MappingRow: View {
                     }
                     .labelsHidden()
                     .frame(width: 142)
-                    if mappings.target(for: button, remote: remote) == .custom {
-                        Button { showRecorder = true } label: {
-                            Image(systemName: "record.circle")
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(ConsoleTheme.green)
-                        .help(L10n.text("重新录制按键", "Record again"))
+                    Button { showRecorder = true } label: {
+                        Image(systemName: "record.circle")
                     }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(ConsoleTheme.green)
+                    .help(L10n.text("录制任意按键或组合键", "Record any key or shortcut"))
+                    .accessibilityLabel(L10n.text("为\(button.title)录制按键", "Record shortcut for \(button.title)"))
                 }
             }
         }
@@ -1191,7 +1190,7 @@ private struct MappingRow: View {
         .padding(.horizontal, 9)
         .background(ConsoleTheme.surface2)
         .clipShape(RoundedRectangle(cornerRadius: 8))
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
         .sheet(isPresented: $showRecorder) {
             KeyboardShortcutCaptureView(
                 buttonTitle: button.title,

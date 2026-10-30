@@ -1,0 +1,24 @@
+CHANGELOG.md
+  h_8195c5342f3ab5 3-7
+Packaging/Info.plist
+  h_8195c5342f3ab5 22,24
+README.md
+  h_8195c5342f3ab5 20,41
+Sources/vRemote/DebugWindowController.swift
+  h_8195c5342f3ab5 202,208,259,272,294-298,412,457-459,530-535,586-587,612-624,780-833
+Sources/vRemote/main.swift
+  h_8195c5342f3ab5 581-583,721-724,727
+VERSION
+  h_8195c5342f3ab5 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "af71bbb969511ca649f34ee61061e22480ec39ec",
+  "prompts": {},
+  "humans": {
+    "h_8195c5342f3ab5": {
+      "author": "Tianyi <willorn@qq.com>"
+    }
+  }
+}

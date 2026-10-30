@@ -578,6 +578,9 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self?.chromecastHID.setRemappingEnabled(enabled)
             }
         }
+        debugWindow.onShowInDockChanged = { [weak self] enabled in
+            self?.setShowInDock(enabled)
+        }
     }
 
     @objc private func openDebugWindow() {
@@ -715,9 +718,13 @@ final class AppController: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func toggleShowInDock() {
-        let enabled = !AppStorage.showInDock
+        setShowInDock(!AppStorage.showInDock)
+    }
+
+    private func setShowInDock(_ enabled: Bool) {
         guard NSApp.setActivationPolicy(enabled ? .regular : .accessory) else { return }
         AppStorage.showInDock = enabled
+        debugWindow.updateShowInDock(enabled)
         refreshMenuState()
     }
 

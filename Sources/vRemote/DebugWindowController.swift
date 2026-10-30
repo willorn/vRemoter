@@ -199,11 +199,13 @@ private enum RemoteImageAsset {
 private enum ConsoleModal: Identifiable {
     case permission(PermissionKind)
     case purchase
+    case settings
 
     var id: String {
         switch self {
         case .permission(let kind): "permission-\(kind.id)"
         case .purchase: "purchase"
+        case .settings: "settings"
         }
     }
 }
@@ -254,6 +256,7 @@ private final class ConsoleViewModel: ObservableObject {
     @Published var inputTriggerKey = AppStorage.inputTriggerKey
     @Published var showVoiceShortcutRecorder = false
     @Published var voiceInputMethod = AppStorage.voiceInputMethod
+    @Published var showInDock = AppStorage.showInDock
     @Published var activeModal: ConsoleModal?
     @Published var showX6MicHint = !UserDefaults.standard.bool(
         forKey: "vRemoter.hasCompletedX6MicTest"
@@ -266,6 +269,7 @@ private final class ConsoleViewModel: ObservableObject {
     var onRemoteInputEnabledChanged: ((Bool) -> Void)?
     var onInputTriggerChanged: (() -> Void)?
     var onRemoteMappingEnabledChanged: ((SupportedRemoteID, Bool) -> Void)?
+    var onShowInDockChanged: ((Bool) -> Void)?
 
     var doubaoUsesVRemote: Bool { doubaoInput.contains("vRemoteDr 2ch") }
     var macSolo: Bool { macInputEnabled && !remoteInputEnabled }
@@ -285,6 +289,11 @@ private final class ConsoleViewModel: ObservableObject {
     func setRemoteMappingEnabled(_ enabled: Bool, remote: SupportedRemoteID) {
         RemoteMappingStore.shared.setEnabled(enabled, for: remote)
         onRemoteMappingEnabledChanged?(remote, enabled)
+    }
+
+    func setShowInDock(_ enabled: Bool) {
+        guard showInDock != enabled else { return }
+        onShowInDockChanged?(enabled)
     }
 
     func toggleMacMute() {
@@ -400,6 +409,7 @@ final class DebugWindowController: NSWindowController, NSWindowDelegate {
     var onRemoteInputEnabledChanged: ((Bool) -> Void)?
     var onInputTriggerChanged: (() -> Void)?
     var onRemoteMappingEnabledChanged: ((SupportedRemoteID, Bool) -> Void)?
+    var onShowInDockChanged: ((Bool) -> Void)?
 
     private let model = ConsoleViewModel()
     private var permissionTimer: Timer?
@@ -443,6 +453,9 @@ final class DebugWindowController: NSWindowController, NSWindowDelegate {
         }
         model.onRemoteMappingEnabledChanged = { [weak self] remote, enabled in
             self?.onRemoteMappingEnabledChanged?(remote, enabled)
+        }
+        model.onShowInDockChanged = { [weak self] enabled in
+            self?.onShowInDockChanged?(enabled)
         }
         window.contentView = NSHostingView(
             rootView: StudioMixerView(model: model)
@@ -514,6 +527,12 @@ final class DebugWindowController: NSWindowController, NSWindowDelegate {
         show()
     }
 
+    func updateShowInDock(_ enabled: Bool) {
+        DispatchQueue.main.async { [weak self] in
+            self?.model.showInDock = enabled
+        }
+    }
+
     func windowWillClose(_ notification: Notification) {
         permissionTimer?.invalidate()
         permissionTimer = nil
@@ -564,6 +583,8 @@ private struct StudioMixerView: View {
                 )
             case .purchase:
                 PurchaseView(model: .shared)
+            case .settings:
+                SettingsView(model: model)
             }
         }
         .onAppear {
@@ -588,6 +609,19 @@ private struct StudioMixerView: View {
             ConsolePageSelector(selection: $model.selectedPage)
                 .frame(width: 202)
             Spacer()
+            Button {
+                model.activeModal = .settings
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(ConsoleTheme.secondary)
+                    .frame(width: 30, height: 30)
+                    .background(ConsoleTheme.black.opacity(0.72))
+                    .clipShape(RoundedRectangle(cornerRadius: 9))
+            }
+            .buttonStyle(.plain)
+            .help(L10n.text("显示设置", "Display settings"))
+            .accessibilityLabel(L10n.text("显示设置", "Display settings"))
             HStack(spacing: 7) {
                 Circle()
                     .fill(statusColor)
@@ -740,6 +774,60 @@ private struct StudioMixerView: View {
             return L10n.text("正在连接语音服务", "Connecting voice service")
         }
         return L10n.text("HID 与 BLE 未连接", "HID and BLE disconnected")
+    }
+}
+
+private struct SettingsView: View {
+    @ObservedObject var model: ConsoleViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack {
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 20))
+                    .foregroundStyle(ConsoleTheme.green)
+                Text(L10n.text("显示设置", "Display settings"))
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(ConsoleTheme.text)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Toggle(
+                    L10n.text("在 Dock 中显示", "Show in Dock"),
+                    isOn: Binding(
+                        get: { model.showInDock },
+                        set: model.setShowInDock
+                    )
+                )
+                .toggleStyle(.switch)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(ConsoleTheme.text)
+
+                Text(L10n.text(
+                    "关闭后只保留菜单栏图标；可随时从这里或菜单栏菜单重新打开。",
+                    "When off, only the menu bar icon remains. Re-enable it here or from the menu bar menu."
+                ))
+                .font(.system(size: 12))
+                .foregroundStyle(ConsoleTheme.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(16)
+            .background(panelBackground(ConsoleTheme.surface, radius: 12))
+
+            Spacer()
+
+            HStack {
+                Spacer()
+                Button(L10n.text("完成", "Done")) {
+                    model.activeModal = nil
+                }
+                .keyboardShortcut(.defaultAction)
+                .buttonStyle(ConsoleButtonStyle(tone: ConsoleButtonTone.good))
+            }
+        }
+        .padding(22)
+        .frame(width: 440, height: 270)
+        .background(ConsoleTheme.panel)
     }
 }
 
